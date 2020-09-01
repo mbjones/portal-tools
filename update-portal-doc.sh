@@ -1,16 +1,12 @@
 #!/bin/sh
-# Usage: update-portal-doc.sh portal-doc sysmeta
+# Usage: update-portal-doc.sh portal-file sysmeta-file token
 PORTAL=$1
 SYSMETA=$2
-SERVICE="https://cn.dataone.org/cn/v2/"
+TOKEN=$3
+
+REPO="https://mn-ucsb-1.dataone.org/knb/d1/mn/v2"
 D1NS="http://ns.dataone.org/service/types/v2.0"
 PONS="https://purl.dataone.org/portals-1.0.0"
-#PID=`curl -s ${SERVICE}/query/solr/?q=\(label:%22${LABEL}%22%20OR%20seriesId:%22${LABEL}%22\)%20AND%20-obsoletedBy:*\&fl=seriesId,id,label,datasource,obsoletes,obsoletedBy\&sort=dateUploaded%20asc\&rows=100\&wt=json | jq -r '.response.docs[0].id'`
-#curl -s ${SERVICE}/meta/${PID} -o ${LABEL}-sysmeta.xml
-#echo "Saved system metadata doc to ${LABEL}-sysmeta.xml"
-#curl -s ${SERVICE}/object/${PID} -o ${LABEL}-portal.xml
-#echo "Saved portal doc to ${LABEL}-portal.xml."
-
 
 # Extract label from portal doc
 LABEL=`xml sel -N por="${PONS}" -t -m "//por:portal" -v "label" ${PORTAL}`
@@ -43,7 +39,16 @@ xml ed -N d1="${D1NS}" \
     -u /d1:systemMetadata/checksum/@algorithm -v "SHA-256" \
     -u /d1:systemMetadata/fileName -v "${LABEL}-portal.xml" \
     -d /d1:systemMetadata/replica \
-    ${SYSMETA}
+    ${SYSMETA} > ${LABEL}-sysmeta-new.xml
+
+# Ensure we have a valid TOKEN
+#curl -H "Authorization: Bearer ${TOKEN}" ${SERVICE}/diag/subject
 
 # Update the existing document on the node
+curl -H "Authorization: Bearer ${TOKEN}" \
+    -X PUT \
+    -F "object=@${PORTAL}" \
+    -F "newPid=${UUID}" \
+    -F "sysmeta=@${LABEL}-sysmeta-new.xml" \
+    ${REPO}/object/${OLD_PID}
 
